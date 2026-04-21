@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Scan Kho</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+
+<body>
+<h2>📦 Scan Kho</h2>
+
+<input id="location" placeholder="Location"><br><br>
+<input id="sku" placeholder="Scan SKU"><br><br>
+<input id="qty" type="number" placeholder="Số lượng"><br><br>
+
+<select id="type">
+  <option value="IN">Nhập</option>
+  <option value="OUT">Xuất</option>
+</select><br><br>
+
+<input id="staff" placeholder="Nhân viên"><br><br>
+
+<button onclick="saveData()">Lưu</button>
+
+<p id="status"></p>
+
+<div id="reader" style="width:300px"></div>
+
+<audio id="ok" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<audio id="fail" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbyRIsCr-6vHgoJEf0m2ikHfcxjHz0LfkQ91Q8qtEoOj6owdi-44HVxVaF6AD6HIM_aA/exec";
+
+let dataList = [];
+
+// load data
+async function loadData() {
+  let res = await fetch(API);
+  dataList = await res.json();
+}
+loadData();
+
+// unlock audio
+document.body.addEventListener("click", () => {
+  let a = document.getElementById("ok");
+  a.play().catch(()=>{});
+  a.pause();
+  a.currentTime = 0;
+}, { once: true });
+
+// tìm SKU
+function findSKU(sku) {
+  return dataList.find(x => x.sku == sku);
+}
+
+// auto fill
+document.getElementById("sku").addEventListener("input", function() {
+  let item = findSKU(this.value);
+
+  if (item) {
+    document.getElementById("location").value = item.location;
+    document.getElementById("status").innerText = "✅ Tồn: " + item.toncuoi;
+  } else {
+    document.getElementById("status").innerText = "❌ Không có SKU";
+  }
+});
+
+// lưu
+async function saveData() {
+  let sku = skuEl.value.trim();
+  let location = locationEl.value.trim();
+  let qty = qtyEl.value;
+
+  if (!sku || !qty || !location) {
+    status.innerText = "❌ Thiếu dữ liệu";
+    fail.play();
+    navigator.vibrate(200);
+    return;
+  }
+
+  let item = findSKU(sku);
+  if (!item) {
+    status.innerText = "❌ SKU sai";
+    fail.play();
+    return;
+  }
+
+  await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({
+      sku: sku,
+      location: location,
+      qty: qty,
+      type: type.value,
+      staff: staff.value
+    })
+  });
+
+  status.innerText = "✅ OK";
+  ok.play();
+
+  skuEl.value = "";
+  qtyEl.value = "";
+  locationEl.value = "";
+}
+
+// scan camera
+function onScanSuccess(text) {
+  skuEl.value = text;
+
+  let item = findSKU(text);
+  if (item) {
+    locationEl.value = item.location;
+    status.innerText = "✅ Scan OK";
+    ok.play();
+  } else {
+    status.innerText = "❌ Không có SKU";
+    fail.play();
+  }
+}
+
+let scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+scanner.render(onScanSuccess);
+
+// shortcut
+let skuEl = document.getElementById("sku");
+let locationEl = document.getElementById("location");
+let qtyEl = document.getElementById("qty");
+let status = document.getElementById("status");
+let ok = document.getElementById("ok");
+let fail = document.getElementById("fail");
+</script>
+
+</body>
+</html>
