@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DDK MASTER FINAL - DATE FIXED</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #fdfaf3; --primary: #8b5e3c; --accent: #d4a373; }
+        body { margin: 0; font-family: 'Lexend', sans-serif; background: var(--bg); overflow: hidden; height: 100vh; }
+        header { background: var(--primary); color: #fff; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; height: 50px; box-sizing: border-box; }
+        
+        .main-layout { display: flex; padding: 12px; gap: 15px; height: calc(100vh - 50px); box-sizing: border-box; }
+        .dash-area { flex: 2.4; display: grid; grid-template-rows: 55px 270px 1fr; gap: 12px; height: 100%; min-width: 850px; }
+        .dash-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 100%; }
+        
+        .input-side { flex: 0.9; background: #fff; border-radius: 15px; padding: 20px; border: 1px solid #eee; height: 100%; min-width: 360px; box-sizing: border-box; overflow-y: auto; }
+        .card { background: #fff; border-radius: 12px; padding: 12px; border: 1px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; overflow: hidden; }
+        
+        .overview-row { display: flex; gap: 10px; flex: 1; margin: 0 20px; }
+        .ov-item { background: #fdfaf3; border: 1px solid var(--accent); border-radius: 8px; padding: 4px 12px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .ov-label { font-size: 10px; font-weight: 600; color: #8b5e3c; }
+        .ov-value { font-size: 16px; font-weight: bold; }
+
+        .scroll-v { flex: 1; overflow-y: auto; border: 1px solid #f8f8f8; border-radius: 8px; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { position: sticky; top: 0; background: #f8f8f8; padding: 10px; text-align: left; z-index: 10; border-bottom: 2px solid #eee; }
+        td { padding: 9px; border-bottom: 1px solid #f9f9f9; }
+
+        .hint-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; border: 2px dashed var(--accent); border-radius: 10px; text-align: center; margin-bottom: 15px; }
+        input, select { width: 100%; padding: 12px; border: 1.5px solid #eee; border-radius: 10px; margin-top: 5px; box-sizing: border-box; }
+        .scan-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .scan-actions input { margin-top: 0; }
+        .btn-scan { padding: 10px 12px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 10px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+        #btn-save { width: 100%; padding: 18px; background: var(--primary); color: #fff; border: none; border-radius: 12px; font-weight: bold; margin-top: 15px; cursor: pointer; }
+        #login-overlay { position: fixed; inset: 0; background: var(--primary); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        #scan-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9998; display: none; align-items: center; justify-content: center; }
+        .scan-modal { width: 92%; max-width: 520px; background: #fff; border-radius: 14px; border: 1px solid #eee; box-shadow: 0 8px 30px rgba(0,0,0,0.2); overflow: hidden; }
+        .scan-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f0f0f0; }
+        .scan-body { padding: 14px 16px; }
+        #camera-select { margin-top: 0; }
+        #barcode-reader { width: 100%; min-height: 260px; border: 1px dashed #ddd; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+
+        @media (max-width: 900px) {
+            body { overflow-y: auto; height: auto; min-height: 100vh; }
+            .main-layout { flex-direction: column; height: auto; padding: 10px; }
+            .dash-area { min-width: 0; width: 100%; grid-template-rows: auto auto auto; }
+            .dash-top { grid-template-columns: 1fr; height: auto; }
+            .input-side { min-width: 0; width: 100%; height: auto; }
+            .overview-row { margin: 0 6px; }
+            .ov-item { padding: 6px 8px; }
+            header { padding: 10px 12px; }
+            #clock { font-size: 14px !important; }
+            #btn-save { padding: 14px; }
+            .scan-modal { width: 96%; max-width: none; }
+            #barcode-reader { min-height: 220px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div style="background:#fff; padding:40px; border-radius:25px; text-align:center; width:320px;">
+        <h2 style="color:var(--primary)">DDK LOGIN</h2>
+        <input type="password" id="pin-val" placeholder="Mã PIN" style="text-align:center; font-size:24px; letter-spacing:8px;">
+        <button onclick="handleLogin()" style="width:100%; margin-top:30px; padding:15px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-weight:bold; cursor:pointer;">XÁC NHẬN</button>
+    </div>
+</div>
+
+<div id="scan-backdrop">
+    <div class="scan-modal">
+        <div class="scan-head">
+            <b>SCAN BARCODE</b>
+            <button type="button" class="btn-scan" onclick="closeScan()">ĐÓNG</button>
+        </div>
+        <div class="scan-body">
+            <div style="font-size:12px; color:#666; margin-bottom:10px;">Cho camera thấy rõ mã vạch. Quét thành công sẽ tự điền vào ô SKU.</div>
+            <div style="display:flex; gap:8px;">
+                <select id="camera-select"></select>
+                <button type="button" class="btn-scan" onclick="startScanFromSelectedCamera()">BẮT ĐẦU QUÉT</button>
+            </div>
+            <div id="barcode-reader"></div>
+        </div>
+    </div>
+</div>
+
+<header>
+    <div style="font-weight:bold;">DDK MASTER CONSOLE</div>
+    <div style="display:flex; align-items:center; gap:20px;">
+        <div style="text-align:right">
+            <small id="user-name">👤 Guest</small>
+            <div style="width:100px; height:5px; background:rgba(255,255,255,0.2); border-radius:3px; margin-top:3px;"><div id="p-fill" style="width:0%; height:100%; background:#fff; transition:0.5s;"></div></div>
+        </div>
+        <div id="clock" style="font-family:monospace; font-size:17px;">00:00:00</div>
+    </div>
+</header>
+
+<div class="main-layout">
+    <div class="dash-area">
+        <div class="card" style="flex-direction:row; align-items:center; padding:5px 15px;">
+            <b style="font-size:12px; min-width:140px;">DASHBOARD</b>
+            <div class="overview-row">
+                <div class="ov-item"><span class="ov-label">SKU</span><span id="ov-sku" class="ov-value">0</span></div>
+                <div class="ov-item"><span class="ov-label">TỔNG TỒN</span><span id="ov-total" class="ov-value">0</span></div>
+            </div>
+            <input type="date" id="date-pick" onchange="loadDash()" style="width:130px; padding:4px;">
+        </div>
+
+        <div class="dash-top">
+            <div class="card">
+                <small><b>PHÂN BỔ XUẤT KHO</b></small>
+                <div style="flex:1; position:relative; padding:10px;"><canvas id="chart-sales"></canvas></div>
+            </div>
+            <div class="card">
+                <small><b>GIAO DỊCH GẦN NHẤT</b></small>
+                <div class="scroll-v"><table id="log-list"></table></div>
+            </div>
+        </div>
+
+        <div class="card dash-bottom">
+            <small><b>BẢNG TỒN KHO TỔNG</b></small>
+            <div class="scroll-v"><table id="stock-list"></table></div>
+        </div>
+    </div>
+
+    <div class="input-side">
+        <div style="display:flex; background:#f0f0f0; border-radius:10px; padding:4px; margin-bottom:15px;">
+            <button id="m-int" style="flex:1; padding:10px; border:none; border-radius:8px; cursor:pointer; background:#fff;" onclick="setMode('INTERNAL')">NỘI BỘ</button>
+            <button id="m-ret" style="flex:1; padding:10px; border:none; border-radius:8px; cursor:pointer; background:transparent;" onclick="setMode('RETAIL')">XUẤT BÁN</button>
+        </div>
+        <div class="hint-grid">
+            <div><small>REP</small><br><b id="h-rep">0</b></div>
+            <div><small>RACK</small><br><b id="h-rack">0</b></div>
+            <div><small>TOT</small><br><b id="h-tot" style="color:var(--primary)">0</b></div>
+        </div>
+        <label style="font-size:11px; font-weight:600">MÃ SKU</label>
+        <div class="scan-actions">
+            <input type="text" id="sku" placeholder="Quét SKU...">
+            <button type="button" class="btn-scan" onclick="openScan()">SCAN</button>
+        </div>
+        <label style="font-size:11px; font-weight:600; display:block; margin-top:15px">VỊ TRÍ GỢI Ý</label>
+        <input type="text" id="vtri" readonly style="background:#f9f9f9; font-weight:bold;">
+        <label style="font-size:11px; font-weight:600; display:block; margin-top:15px">SỐ LƯỢNG</label>
+        <input type="number" id="qty">
+        <label style="font-size:11px; font-weight:600; display:block; margin-top:15px">HÌNH THỨC</label>
+        <select id="io-type"><option value="OUT">XUẤT (OUT)</option><option value="IN">NHẬP (IN)</option></select>
+        <button id="btn-save" onclick="saveData()">XÁC NHẬN LƯU</button>
+        <div id="status" style="text-align:center; font-size:12px; margin-top:15px; font-weight:bold;"></div>
+    </div>
+</div>
+
+<script>
+    const api = "https://script.google.com/macros/s/AKfycbyQldwGtnebGzgavr7fekk3JOZU1VfCSrmrHrsuBZs07uA1itkP9qMkIb1SXr49mWq0/exec"; 
+    let user = "", mode = "INTERNAL", salesChart;
+    let html5Qr = null, scanActive = false;
+
+    document.getElementById('date-pick').valueAsDate = new Date();
+
+    function beep(type) {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.connect(g); g.connect(ctx.destination);
+            osc.frequency.value = type === 'ok' ? 880 : 220;
+            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+            osc.start(); osc.stop(ctx.currentTime + 0.4);
+        } catch (e) {
+            // Some mobile browsers block audio context; ignore sound errors.
+        }
+    }
+
+    async function handleLogin() {
+        const pin = document.getElementById('pin-val').value;
+        const r = await fetch(`${api}?type=login&pin=${pin}`);
+        const d = await r.json();
+        if(d.success) {
+            user = d.name;
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('user-name').innerText = "👤 " + user;
+            beep('ok'); loadDash();
+        } else { alert("Sai mã PIN!"); beep('err'); }
+    }
+
+    function setMode(m) {
+        mode = m;
+        document.getElementById('m-int').style.background = m==='INTERNAL'?'#fff':'transparent';
+        document.getElementById('m-ret').style.background = m==='RETAIL'?'#fff':'transparent';
+    }
+
+    async function openScan() {
+        const backdrop = document.getElementById('scan-backdrop');
+        backdrop.style.display = 'flex';
+        if (scanActive) return;
+        try {
+            const cams = await Html5Qrcode.getCameras();
+            const sel = document.getElementById('camera-select');
+            sel.innerHTML = "";
+            cams.forEach(c => {
+                const op = document.createElement('option');
+                op.value = c.id;
+                op.textContent = c.label || c.id;
+                sel.appendChild(op);
+            });
+            if (!cams.length) alert("Không tìm thấy camera.");
+        } catch (e) {
+            alert("Không thể truy cập camera.");
+        }
+    }
+
+    async function startScanFromSelectedCamera() {
+        const camId = document.getElementById('camera-select').value;
+        if (!camId || scanActive) return;
+        if (!html5Qr) html5Qr = new Html5Qrcode("barcode-reader");
+        try {
+            await html5Qr.start(
+                camId,
+                { fps: 10, qrbox: { width: 240, height: 120 } },
+                (decodedText) => {
+                    const skuInput = document.getElementById('sku');
+                    skuInput.value = decodedText.trim().toUpperCase();
+                    skuInput.dispatchEvent(new Event('change'));
+                    closeScan();
+                }
+            );
+            scanActive = true;
+        } catch (e) {
+            alert("Không thể bắt đầu quét.");
+        }
+    }
+
+    async function closeScan() {
+        document.getElementById('scan-backdrop').style.display = 'none';
+        if (html5Qr && scanActive) {
+            try { await html5Qr.stop(); } catch (e) {}
+            try { await html5Qr.clear(); } catch (e) {}
+        }
+        scanActive = false;
+    }
+
+    document.getElementById('sku').addEventListener('change', async (e) => {
+        const sku = e.target.value.trim().toUpperCase();
+        if(!sku) return;
+        const r = await fetch(`${api}?type=sku_hint&sku=${sku}&category=${mode}`);
+        const d = await r.json();
+        if(d.success) {
+            document.getElementById('vtri').value = d.location;
+            document.getElementById('h-rep').innerText = d.replenish;
+            document.getElementById('h-rack').innerText = d.rack;
+            document.getElementById('h-tot').innerText = d.total;
+            document.getElementById('qty').focus();
+            beep('ok');
+        } else { beep('err'); }
+    });
+
+    async function saveData() {
+        const d = { category: mode, sku: document.getElementById('sku').value.toUpperCase(), location: document.getElementById('vtri').value, qty: document.getElementById('qty').value, type: document.getElementById('io-type').value, staff: user };
+        if(!d.sku || !d.qty) return;
+        document.getElementById('status').innerText = "⌛ Đang lưu...";
+        await fetch(api, { method: "POST", body: JSON.stringify(d) });
+        document.getElementById('status').innerHTML = "<span style='color:green'>✅ Đã lưu thành công!</span>";
+        document.getElementById('sku').value = ""; document.getElementById('qty').value = "";
+        beep('ok'); loadDash();
+    }
+
+    async function loadDash() {
+        // CHỈNH SỬA TẠI ĐÂY: Format ngày gửi lên là dd/MM/yyyy
+        const dateInput = document.getElementById('date-pick').value;
+        const [y, m, d_] = dateInput.split('-');
+        const dateStr = `${d_}/${m}/${y}`;
+
+        const r = await fetch(`${api}?type=all`);
+        const d = await r.json();
+        
+        document.getElementById('ov-sku').innerText = d.stock.length;
+        document.getElementById('ov-total').innerText = d.stock.reduce((a,b)=>a+Number(b.g),0).toLocaleString();
+
+        let hS = "<thead><tr><th>SKU</th><th>REP</th><th>RACK</th><th>TỔNG</th><th>VỊ TRÍ</th></tr></thead><tbody>";
+        d.stock.forEach(i => hS += `<tr><td>${i.sku}</td><td>${i.e}</td><td>${i.f}</td><td><b>${i.g}</b></td><td>${i.note||''}</td></tr>`);
+        document.getElementById('stock-list').innerHTML = hS + "</tbody>";
+
+        let hL = "";
+        d.logs.slice(0,10).forEach(l => hL += `<tr><td>${new Date(l[0]).toLocaleTimeString()}</td><td>${l[2]}</td><td>${l[4]}</td><td>${l[3]}</td></tr>`);
+        document.getElementById('log-list').innerHTML = hL;
+
+        const rK = await fetch(`${api}?type=daily_sales&date=${dateStr}&userName=${user}`);
+        const k = await rK.json();
+        document.getElementById('p-fill').style.width = Math.min(k.progress * 10, 100) + "%";
+        
+        const top = k.sales.slice(0,5);
+        if(salesChart) salesChart.destroy();
+        salesChart = new Chart(document.getElementById('chart-sales'), {
+            type: 'pie',
+            data: { 
+                labels: top.map(s=>s.sku), 
+                datasets:[{ data: top.map(s=>s.qty), backgroundColor:['#8b5e3c','#d4a373','#e9edc9','#ccd5ae','#faedcd'] }] 
+            },
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } }
+        });
+    }
+    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }, 1000);
+</script>
+</body>
+</html>
